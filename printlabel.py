@@ -146,6 +146,29 @@ def set_args():
         default=None,
     )
     p.add_argument(
+        '--font-scale',
+        type=float,
+        default=None,
+        metavar='NUMBER',
+        help='Scale font size by specified percentage (default: 100%%)'
+    )
+    p.add_argument(
+        '--h-padding',
+        type=int,
+        default=5,
+        metavar='DOTS',
+        help='Define custom left and right horizontal padding in pixels'
+        ' (default: 5 pixels left and 5 pixels right)'
+    )
+    p.add_argument(
+        '--v-shift',
+        type=int,
+        default=0,
+        metavar='DOTS',
+        help='Define relative vertical traslation in pixels'
+        ' (default is to vertically center the font)'
+    )
+    p.add_argument(
         '--white-level',
         help='Minimum pixel value to consider it "white" when'
         ' cropping the image. Set it to a value close to 255. (Default: 240)',
@@ -242,7 +265,6 @@ def main():
         height_of_the_printable_area = 64  # px: number of vertical pixels of the PT-P300BT printer (9 mm)
         height_of_the_tape = 86  # 64 px / 9 mm * 12 mm (the borders over the printable area will not be printed)
         height_of_the_image = 88  # px (can be any value >= height_of_the_tape, but height_of_the_tape + 2 border lines is good)
-        h_padding = 5  # horizontal padding (left and right)
 
         # Compute max TT font size to remain within height_of_the_printable_area
         font_size = 0
@@ -273,16 +295,37 @@ def main():
                         f' instead of {height_of_the_printable_area}.')
                     break
 
+            y_position = print_border
+            if args.font_scale:
+                scaled_font_size = int(
+                    round(font_size * (args.font_scale / 100.0))
+                )
+                try:
+                    font = ImageFont.truetype(
+                        args.fontname, scaled_font_size, encoding='utf-8'
+                    )
+                except Exception as e:
+                    p.error(f'Cannot load font "{args.fontname}" - {e}')
+                font_width, font_height = font.getbbox(text, anchor="lt")[2:]
+
+                # Vertically center text
+                y_position = print_border + (
+                    height_of_the_printable_area - font_height
+                ) // 2
+
             # Create a drawing context for the image
             image = Image.new(
                 "RGB",
-                (font_width + h_padding * 2 + 1, height_of_the_image),
+                (
+                    font_width + args.h_padding * 2 + 1 + args.end_margin,
+                    height_of_the_image
+                ),
                 "white"
             )
             draw = ImageDraw.Draw(image)
             try:
                 draw.text(
-                    (h_padding, print_border), text,
+                    (args.h_padding, y_position + args.v_shift), text,
                     font=font,
                     fill=args.fill,
                     anchor="lt",
@@ -294,7 +337,7 @@ def main():
             if args.text_size:
                 text_size = (
                     int(args.text_size / 0.149)
-                    - h_padding
+                    - args.h_padding
                     - args.end_margin
                 )  # mm to dot
                 _, _, text_width, text_height = draw.textbbox(
@@ -305,7 +348,7 @@ def main():
                 )
                 scale_factor = text_width / text_size
                 image = image.transform(
-                    (text_size + args.end_margin, height_of_the_image),
+                    (text_size + args.end_margin + args.h_padding, height_of_the_image),
                     Image.Transform.AFFINE,
                     (scale_factor, 0, 0, 0, 1, 0),
                 )
