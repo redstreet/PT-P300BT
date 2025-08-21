@@ -13,6 +13,8 @@ This repository provides a command-line tool in pure Python to print from a comp
 
 The scripts convert text labels to appropriate images (including the first page of a PDF conversion with "pdf2image" and which requires poppler to be installed) compatible with 12mm width craft tapes like [TZe-131](https://www.brother-usa.com/products/tze131) or [TZe-231](https://www.brother-usa.com/products/tze231), tuned for the max allowed character size with this printer, regardless the used font. The scripts also include the code to drive the printer via serial Bluetooth interface.
 
+Text can be multiline when the text includes "\n" characters. (Use the two characters `\n` in your text to create line breaks). The `--line-spacing` option controls the spacing between lines (default: 1.2, meaning 20% extra space between lines). The font size is automatically calculated to fit all lines within the printable area. The `--center-text` option allows horizontally centering each single line.
+
 Comparing with the PT-P300BT Gist, the Python *printlabel.py* program has been introduced, replacing *printlabel.cmd* and *printlabel.sh*. It supports any TrueType and OpenType font, automatically selects the maximum font size to fit the printable area of the tape, avoids creating temporary image files, provides more accurate image processing and does not rely on ImageMagick. Text strings including characters which do not [overshoot](https://en.wikipedia.org/wiki/Overshoot_(typography)) below the [baseline](https://en.wikipedia.org/wiki/Baseline_(typography)) (e.g., uppercase letters) are automatically printed with a bigger font. In addition, the program calculates the size of the printed tape and the print duration and processes images.
 
 Standard usage: `python3 printlabel.py COM_PORT FONT_NAME TEXT_TO_PRINT`
@@ -32,27 +34,30 @@ printlabel.exe COM7 "arial.ttf" "Lorem Ipsum"
 In addition, all options included in *labelmaker.py* are available, with several extensions.
 
 ```
-usage: printlabel.py [-h] [-u] [-l] [-s] [-c] [-i FILE_NAME] [-M FILE_NAME] [-R FLOAT] [-X DOTS]
-                     [-Y DOTS] [-S FILE_NAME] [-n] [-F] [-a] [-m DOTS] [-r] [-C]
-                     [--fill-color FILL] [--stroke-fill STROKE_FILL] [--stroke-width STROKE_WIDTH]
-                     [--text-size MILLIMETERS] [--font-scale NUMBER] [--h-padding DOTS]
-                     [--v-shift DOTS] [--white-level NUMBER] [--threshold NUMBER]
+usage: printlabel.py [-h] [-u] [-l] [-s] [-c] [-i FILE_NAME] [-M FILE_NAME] [-R FLOAT]
+                     [-X DOTS] [-Y DOTS] [-S FILE_NAME] [-n] [-F] [-a] [-m DOTS] [-r] [-C]
+                     [--fill-color FILL] [--stroke-fill STROKE_FILL]
+                     [--stroke-width STROKE_WIDTH] [--text-size MILLIMETERS]
+                     [--font-scale NUMBER] [--h-padding DOTS] [--v-shift DOTS]
+                     [-p MULTIPLIER] [-H] [--white-level NUMBER] [--threshold NUMBER]
                      COM_PORT [FONT_NAME] [TEXT_TO_PRINT ...]
 
 positional arguments:
   COM_PORT              Printer COM port.
   FONT_NAME             Pathname of the used TrueType or OpenType font.
-  TEXT_TO_PRINT         Text to be printed. UTF8 characters are accepted.
+  TEXT_TO_PRINT         Text to be printed. UTF8 characters are accepted. Use \n for line
+                        breaks.
 
 optional arguments:
   -h, --help            show this help message and exit
   -u, --unicode         Use Unicode escape sequences in TEXT_TO_PRINT.
-  -l, --lines           Add horizontal lines for drawing area (dotted red) and tape (cyan).
+  -l, --lines           Add horizontal lines for drawing area (dotted red) and tape
+                        (cyan).
   -s, --show            Show the created image. (If also using -n, terminate.)
   -c, --show-conv       Show the converted image. (If also using -n, terminate.)
   -i FILE_NAME, --image FILE_NAME
-                        Image file to print. If this option is used (legacy mode), TEXT_TO_PRINT
-                        and FONT_NAME are ignored.
+                        Image file to print. If this option is used (legacy mode),
+                        TEXT_TO_PRINT and FONT_NAME are ignored.
   -M FILE_NAME, --merge FILE_NAME
                         Merge the image file before the text. Can be used multiple times.
   -R FLOAT, --resize FLOAT
@@ -63,8 +68,8 @@ optional arguments:
                         With image merge, shift down the image of Y dots.
   -S FILE_NAME, --save FILE_NAME
                         Save the produced image to a PNG file.
-  -n, --no-print        Only configure the printer and send the image but do not send print
-                        command.
+  -n, --no-print        Only configure the printer and send the image but do not send
+                        print command.
   -F, --no-feed         Disable feeding at the end of the print (chaining).
   -a, --auto-cut        Enable auto-cutting (or print label boundary on e.g. PT-P300BT).
   -m DOTS, --end-margin DOTS
@@ -79,14 +84,18 @@ optional arguments:
   --text-size MILLIMETERS
                         Horizontally stretch the text to fit the specified size.
   --font-scale NUMBER   Scale font size by specified percentage (default: 100%)
-  --h-padding DOTS      Define custom left and right horizontal padding in pixels (default: 5
-                        pixels left and 5 pixels right)
-  --v-shift DOTS        Define relative vertical traslation in pixels (default is to vertically
-                        center the font)
-  --white-level NUMBER  Minimum pixel value to consider it "white" when cropping the image. Set it
-                        to a value close to 255. (Default: 240)
-  --threshold NUMBER    Custom thresholding when converting the image to binary, to manually
-                        decide which pixel values become black or white (Default: 75)
+  --h-padding DOTS      Define custom left and right horizontal padding in pixels
+                        (default: 5 pixels left and 5 pixels right)
+  --v-shift DOTS        Define relative vertical traslation in pixels (default is to
+                        vertically center the font)
+  -p MULTIPLIER, --line-spacing MULTIPLIER
+                        Line spacing multiplier for multi-line text (default: 1.2)
+  -H, --center-text     Horizontally center text inside the label image.
+  --white-level NUMBER  Minimum pixel value to consider it "white" when cropping the
+                        image. Set it to a value close to 255. (Default: 240)
+  --threshold NUMBER    Custom thresholding when converting the image to binary, to
+                        manually decide which pixel values become black or white (Default:
+                        75)
 ```
 
 Options `-sln` are useful to simulate the print, showing the created image and adding a ruler in inches and centimeters (magenta), with horizontal lines to mark the drawing area (dotted red) and the tape borders (cyan).

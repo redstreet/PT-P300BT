@@ -3,6 +3,7 @@ import os
 import re
 import argparse
 import serial
+from serial.tools import list_ports
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pdf2image import convert_from_path
 
@@ -30,7 +31,7 @@ def set_args():
         'text_to_print',
         metavar='TEXT_TO_PRINT',
         nargs='*',
-        help='Text to be printed. UTF8 characters are accepted.'
+        help='Text to be printed. UTF8 characters are accepted. Use \\n for line breaks.'
     )
     p.add_argument(
         '-u', '--unicode',
@@ -169,6 +170,20 @@ def set_args():
         ' (default is to vertically center the font)'
     )
     p.add_argument(
+        '-p',
+        '--line-spacing',
+        type=float,
+        default=1.2,
+        metavar='MULTIPLIER',
+        help='Line spacing multiplier for multi-line text (default: 1.2)'
+    )
+    p.add_argument(
+        '-H',
+        '--center-text',
+        help='Horizontally center text inside the label image.',
+        action='store_true'
+    )
+    p.add_argument(
         '--white-level',
         help='Minimum pixel value to consider it "white" when'
         ' cropping the image. Set it to a value close to 255. (Default: 240)',
@@ -250,6 +265,7 @@ def process_image(image_path, resize, white_level, target_height):
         print("No content detected to crop.")
     return None
 
+
 def convert_pdf(filename):
     # Converts the first page of a PDF to a PNG, returns PNG
     output_filename = filename.replace('.pdf', '.png')
@@ -257,9 +273,68 @@ def convert_pdf(filename):
     images[0].save(output_filename, "PNG")
     return output_filename
 
+
+def calculate_multiline_dimensions(lines, font, line_spacing):
+    """Calculate the total width and height needed for multiline text"""
+    max_width = 0
+    total_height = 0
+    
+    line_heights = []
+    for line in lines:
+        bbox = font.getbbox(line, anchor="lt")
+        line_width = bbox[2]
+        line_height = bbox[3]
+        
+        max_width = max(max_width, line_width)
+        line_heights.append(line_height)
+        
+    if len(lines) > 0:
+        # Calculate total height with line spacing
+        base_line_height = max(line_heights) if line_heights else 0
+        total_height = base_line_height * len(lines) + (base_line_height * (line_spacing - 1.0) * (len(lines) - 1))
+    
+    return max_width, int(total_height), line_heights
+
+
+def draw_multiline_text(
+    draw, text_lines, x, y, font, fill,
+    stroke_width, stroke_fill, line_spacing, center_text, image_width
+):
+    """Draw multiple lines of text with proper spacing"""
+    if not text_lines:
+        return
+    
+    sample_bbox = font.getbbox(text_lines[0] if text_lines[0] else "A", anchor="lt")
+    base_line_height = sample_bbox[3]
+    line_spacing_pixels = base_line_height * line_spacing
+    
+    current_y = y
+    for line in text_lines:
+        if line.strip():
+            if center_text:
+                _, _, line_width, _ = draw.textbbox(
+                    (0, 0), line, font=font, stroke_width=stroke_width
+                )
+                x_pos = (image_width - line_width) // 2
+            else:
+                x_pos = x
+            draw.text(
+                (x_pos, current_y), line,
+                font=font,
+                fill=fill,
+                anchor="lt",
+                stroke_width=stroke_width,
+                stroke_fill=stroke_fill
+            )
+        current_y += line_spacing_pixels
+
+
+
 def main():
     p = set_args()
     args = p.parse_args()
+    if args.comport not in [p.device for p in list_ports.comports()]:
+        print("Port '" + args.comport + "' does not seem a valid serial communication port.")        
     data = None
     if args.image is None: # not using the legacy mode
         height_of_the_printable_area = 64  # px: number of vertical pixels of the PT-P300BT printer (9 mm)
@@ -274,88 +349,184 @@ def main():
         if text:
             if args.unicode:
                 text = text.encode().decode('unicode_escape')
-            stop = False
-            while font_height != height_of_the_printable_area:
-                if font_height > height_of_the_printable_area:
-                    font_size -= 1
-                    stop = True
-                else:
-                    font_size += 1
-                try:
-                    font = ImageFont.truetype(
-                        args.fontname, font_size, encoding='utf-8'
+            
+            # Check if text contains newlines to determine processing mode
+            has_newlines = '\\n' in text
+            
+            if has_newlines:
+                # Split text into lines for multiline processing
+                text_lines = text.replace("\\n", "\n").split('\n')
+                
+                stop = False
+                while font_height != height_of_the_printable_area:
+                    if font_height > height_of_the_printable_area:
+                        font_size -= 1
+                        stop = True
+                    else:
+                        font_size += 1
+                    try:
+                        font = ImageFont.truetype(
+                            args.fontname, font_size, encoding='utf-8'
+                        )
+                    except Exception as e:
+                        p.error(f'Cannot load font "{args.fontname}" - {e}')
+                    
+                    # Calculate dimensions for multiline text
+                    font_width, font_height, line_heights = calculate_multiline_dimensions(
+                        text_lines, font, args.line_spacing
                     )
-                except Exception as e:
-                    p.error(f'Cannot load font "{args.fontname}" - {e}')
-                font_width, font_height = font.getbbox(text, anchor="lt")[2:]
-                if stop:
-                    print(
-                        "The max height of this text with font "
-                        f'"{args.fontname}" is {font_height} dots'
-                        f' instead of {height_of_the_printable_area}.')
-                    break
+                    
+                    if stop:
+                        print(
+                            "The max height of this text with font "
+                            f'"{args.fontname}" is {font_height} dots'
+                            f' instead of {height_of_the_printable_area}.')
+                        break
 
-            y_position = print_border
-            if args.font_scale:
-                scaled_font_size = int(
-                    round(font_size * (args.font_scale / 100.0))
-                )
-                try:
-                    font = ImageFont.truetype(
-                        args.fontname, scaled_font_size, encoding='utf-8'
+                y_position = print_border
+                if args.font_scale:
+                    scaled_font_size = int(
+                        round(font_size * (args.font_scale / 100.0))
                     )
-                except Exception as e:
-                    p.error(f'Cannot load font "{args.fontname}" - {e}')
-                font_width, font_height = font.getbbox(text, anchor="lt")[2:]
+                    try:
+                        font = ImageFont.truetype(
+                            args.fontname, scaled_font_size, encoding='utf-8'
+                        )
+                    except Exception as e:
+                        p.error(f'Cannot load font "{args.fontname}" - {e}')
+                    
+                    # Recalculate dimensions with scaled font
+                    font_width, font_height, line_heights = calculate_multiline_dimensions(
+                        text_lines, font, args.line_spacing
+                    )
 
-                # Vertically center text
-                y_position = print_border + (
-                    height_of_the_printable_area - font_height
-                ) // 2
+                    # Vertically center text
+                    y_position = print_border + (
+                        height_of_the_printable_area - font_height
+                    ) // 2
 
-            # Create a drawing context for the image
-            image = Image.new(
-                "RGB",
-                (
-                    font_width + args.h_padding * 2 + 1 + args.end_margin,
-                    height_of_the_image
-                ),
-                "white"
-            )
-            draw = ImageDraw.Draw(image)
-            try:
-                draw.text(
-                    (args.h_padding, y_position + args.v_shift), text,
-                    font=font,
-                    fill=args.fill,
-                    anchor="lt",
-                    stroke_width=args.stroke_width,
-                    stroke_fill=args.stroke_fill
+                # Create a drawing context for the image
+                image = Image.new(
+                    "RGB",
+                    (
+                        font_width + args.h_padding * 2 + 1 + args.end_margin,
+                        height_of_the_image
+                    ),
+                    "white"
                 )
-            except Exception as e:
-                p.error(f"Invalid parameter: {e}")
-            if args.text_size:
-                text_size = (
-                    int(args.text_size / 0.149)
-                    - args.h_padding
-                    - args.end_margin
-                )  # mm to dot
-                _, _, text_width, text_height = draw.textbbox(
-                    (0, 0), text,
-                    anchor="lt",
-                    font=font,
-                    stroke_width=args.stroke_width,
-                )
-                scale_factor = text_width / text_size
-                image = image.transform(
-                    (text_size + args.end_margin + args.h_padding, height_of_the_image),
-                    Image.Transform.AFFINE,
-                    (scale_factor, 0, 0, 0, 1, 0),
-                )
-                while image.getpixel((image.width - 1, 0)) == (0, 0, 0):
-                    crop_box = (0, 0, image.width - 1, height_of_the_image)
-                    image = image.crop(crop_box)
                 draw = ImageDraw.Draw(image)
+                try:
+                    # Draw multiline text
+                    draw_multiline_text(
+                        draw, text_lines, args.h_padding, y_position + args.v_shift,
+                        font, args.fill, args.stroke_width, args.stroke_fill, args.line_spacing,
+                        args.center_text, image.width
+                    )
+                except Exception as e:
+                    p.error(f"Invalid parameter: {e}")
+                
+                if args.text_size:
+                    text_size = (
+                        int(args.text_size / 0.149)
+                        - args.h_padding
+                        - args.end_margin
+                    )  # mm to dot
+                    
+                    # For multiline text, use the width of the widest line for scaling
+                    scale_factor = font_width / text_size
+                    image = image.transform(
+                        (text_size + args.end_margin + args.h_padding, height_of_the_image),
+                        Image.Transform.AFFINE,
+                        (scale_factor, 0, 0, 0, 1, 0),
+                    )
+                    while image.getpixel((image.width - 1, 0)) == (0, 0, 0):
+                        crop_box = (0, 0, image.width - 1, height_of_the_image)
+                        image = image.crop(crop_box)
+                    draw = ImageDraw.Draw(image)
+            else:
+                # Single-line processing
+                stop = False
+                while font_height != height_of_the_printable_area:
+                    if font_height > height_of_the_printable_area:
+                        font_size -= 1
+                        stop = True
+                    else:
+                        font_size += 1
+                    try:
+                        font = ImageFont.truetype(
+                            args.fontname, font_size, encoding='utf-8'
+                        )
+                    except Exception as e:
+                        p.error(f'Cannot load font "{args.fontname}" - {e}')
+                    font_width, font_height = font.getbbox(text, anchor="lt")[2:]
+                    if stop:
+                        print(
+                            "The max height of this text with font "
+                            f'"{args.fontname}" is {font_height} dots'
+                            f' instead of {height_of_the_printable_area}.')
+                        break
+
+                y_position = print_border
+                if args.font_scale:
+                    scaled_font_size = int(
+                        round(font_size * (args.font_scale / 100.0))
+                    )
+                    try:
+                        font = ImageFont.truetype(
+                            args.fontname, scaled_font_size, encoding='utf-8'
+                        )
+                    except Exception as e:
+                        p.error(f'Cannot load font "{args.fontname}" - {e}')
+                    font_width, font_height = font.getbbox(text, anchor="lt")[2:]
+
+                    # Vertically center text
+                    y_position = print_border + (
+                        height_of_the_printable_area - font_height
+                    ) // 2
+
+                # Create a drawing context for the image
+                image = Image.new(
+                    "RGB",
+                    (
+                        font_width + args.h_padding * 2 + 1 + args.end_margin,
+                        height_of_the_image
+                    ),
+                    "white"
+                )
+                draw = ImageDraw.Draw(image)
+                try:
+                    draw.text(
+                        (args.h_padding, y_position + args.v_shift), text,
+                        font=font,
+                        fill=args.fill,
+                        anchor="lt",
+                        stroke_width=args.stroke_width,
+                        stroke_fill=args.stroke_fill
+                    )
+                except Exception as e:
+                    p.error(f"Invalid parameter: {e}")
+                if args.text_size:
+                    text_size = (
+                        int(args.text_size / 0.149)
+                        - args.h_padding
+                        - args.end_margin
+                    )  # mm to dot
+                    _, _, text_width, text_height = draw.textbbox(
+                        (0, 0), text,
+                        anchor="lt",
+                        font=font,
+                        stroke_width=args.stroke_width,
+                    )
+                    scale_factor = text_width / text_size
+                    image = image.transform(
+                        (text_size + args.end_margin + args.h_padding, height_of_the_image),
+                        Image.Transform.AFFINE,
+                        (scale_factor, 0, 0, 0, 1, 0),
+                    )
+                    while image.getpixel((image.width - 1, 0)) == (0, 0, 0):
+                        crop_box = (0, 0, image.width - 1, height_of_the_image)
+                        image = image.crop(crop_box)
+                    draw = ImageDraw.Draw(image)
         else:  # null image
             image = Image.new(
                 "RGB",
@@ -473,6 +644,9 @@ def main():
         x, y = (128 - w) // 2, 0
         nw, nh = x + w, y + h
         padded.paste(binary_img, (x, y, nw, nh))
+        
+        if not image.tobytes():
+            p.error("Null image generated.")
 
         # Compute tape length and print duration
         print_length = padded.size[1] * 0.149  # mm
@@ -506,7 +680,10 @@ def main():
             if args.no_print:
                 quit()
         if args.show:
-            image.show()
+            try:
+                image.show()
+            except Exception as e:
+                p.error("Cannot show image:" + repr(e))
             if not args.show_conv and args.no_print:
                 quit()
         if args.show_conv:
