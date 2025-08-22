@@ -65,11 +65,6 @@ Text can be multiline when the text includes "\n" characters. (Use the two chara
 python printlabel.py -sl COM3 arial.ttf "Line 1\nLine 2\nLine 3"
 ```
 
-### Unicode Text
-```bash
-python printlabel.py -sl -u COM3 arial.ttf "Caf\u00e9"
-```
-
 ## Command Line Arguments
 
 ```
@@ -148,34 +143,41 @@ Before generating the text (`TEXT_TO_PRINT`), the tool allows concatenating imag
 
 `-i` runs the legacy process of *labelmaker.py* and disables image processing.
 
+## Further examples
+
 Example of merging image and text, automatically resizing and traslating the image so that it fits the printable area:
 
-```
-curl https://raw.githubusercontent.com/uroesch/pngpetite/main/samples/pngpetite/happy-sun.png -o happy-sun.png
-python printlabel.py -sl -M happy-sun.png COM7 "Gabriola.ttf" "Hello!"
+```bash
+curl https://raw.githubusercontent.com/uroesch/pngpetite/main/samples/pngpetite/happy-sun.png -o resources/happy-sun.png
+python printlabel.py -sl -M resources/happy-sun.png COM7 "Gabriola.ttf" "Hello!"
 ```
 
 Same as before, but uses the PDF version of happy-sun (it is designed for single page PDFs, like barcodes or other custom icons)
 
-```
-curl https://raw.githubusercontent.com/uroesch/pngpetite/main/samples/pngpetite/happy-sun.png -o happy-sun.png
-python printlabel.py -sl -M happy-sun.pdf COM7 "Gabriola.ttf" "Hello!"
-```
-
-Same as the happy sun png example, but resizing the text so that its length is about 7 centimeters plus heading image, with a small white border at the end:
-```
-python printlabel.py -sl -M happy-sun.png COM7 --text-size 70 --end-margin 10 "micross.ttf" "lorem ipsum dolor sit amet"
+```bash
+curl https://raw.githubusercontent.com/uroesch/pngpetite/main/samples/pngpetite/happy-sun.png -o resources/happy-sun.png
+python printlabel.py -sl -M resources/happy-sun.pdf COM7 "Gabriola.ttf" "Hello!"
 ```
 
-Example of usage of Unicode escape sequences:
+Same as the happy-sun.png example, but resizing the text so that its length is about 7 centimeters plus heading image, with a small white border at the end:
 
+```bash
+python printlabel.py -sl -M resources/happy-sun.png COM7 --text-size 70 --end-margin 10 "micross.ttf" "lorem ipsum dolor sit amet"
 ```
+
+Examples of usage of Unicode escape sequences:
+
+```bash
 python printlabel.py -slnu COM7 "calibri.ttf" "\u2469Note"
+```
+
+```bash
+python printlabel.py -sl -u COM3 arial.ttf "Caf\u00e9"
 ```
 
 Examples of using text stroke:
 
-```
+```bash
 python printlabel.py -sln --stroke-width 2 -m 10 COM7 "arial.ttf" "Bolded text"
 python printlabel.py -sln --stroke-width 1 --fill-color="white" --stroke-fill="black" -m 10 COM7 "Gabriola.ttf" "Text stroke"
 ```
@@ -185,6 +187,24 @@ python printlabel.py -sln --stroke-width 1 --fill-color="white" --stroke-fill="b
 ```
 git clone https://github.com/Ircama/PT-P300BT && cd PT-P300BT
 pip install -r requirements.txt
+```
+
+## Code dependency structure
+
+```mermaid
+graph LR
+    printlabel.py:::highlight --> labelmaker.py
+    labelmaker.py --> labelmaker_encode.py
+    labelmaker.py --> ptcbp.py
+    labelmaker.py --> ptstatus.py
+
+    subgraph Project_Support_Files[Project Support Files]
+        requirements[requirements.txt]
+        spec[printlabel.spec]
+        readme[README.md]
+    end
+
+    classDef highlight fill:#ffeb3b,stroke:#fbc02d,stroke-width:3px;
 ```
 
 ## Bluetooth printer connection on Windows
