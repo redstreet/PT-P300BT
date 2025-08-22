@@ -277,23 +277,23 @@ def convert_pdf(filename):
 def calculate_multiline_dimensions(lines, font, line_spacing):
     """Calculate the total width and height needed for multiline text"""
     max_width = 0
-    total_height = 0
-    
     line_heights = []
+    # Use the same sample as draw_multiline_text for line height
+    sample_bbox = font.getbbox("".join(lines), anchor="lt")
+    base_line_height = sample_bbox[3] - sample_bbox[1]
+    line_spacing_pixels = base_line_height * line_spacing
+    n_lines = len(lines)
     for line in lines:
         bbox = font.getbbox(line, anchor="lt")
-        line_width = bbox[2]
-        line_height = bbox[3]
-        
+        line_width = bbox[2] - bbox[0]
         max_width = max(max_width, line_width)
-        line_heights.append(line_height)
-        
-    if len(lines) > 0:
-        # Calculate total height with line spacing
-        base_line_height = max(line_heights) if line_heights else 0
-        total_height = base_line_height * len(lines) + (base_line_height * (line_spacing - 1.0) * (len(lines) - 1))
-    
-    return max_width, int(total_height), line_heights
+        line_heights.append(base_line_height)
+    total_height = 0
+    for i in range(n_lines):
+        total_height += base_line_height
+        if n_lines > 1 and i < n_lines - 1:
+            total_height += (line_spacing_pixels - base_line_height)
+    return max_width, int(round(total_height)), line_heights
 
 
 def draw_multiline_text(
@@ -304,7 +304,7 @@ def draw_multiline_text(
     if not text_lines:
         return
     
-    sample_bbox = font.getbbox(text_lines[0] if text_lines[0] else "A", anchor="lt")
+    sample_bbox = font.getbbox("".join(text_lines), anchor="lt")
     base_line_height = sample_bbox[3]
     line_spacing_pixels = base_line_height * line_spacing
     
@@ -344,6 +344,7 @@ def main():
         # Compute max TT font size to remain within height_of_the_printable_area
         font_size = 0
         font_height = 0
+        font = None
         print_border = (height_of_the_image - height_of_the_printable_area) / 2
         text = " ".join(args.text_to_print)
         if text:
@@ -360,6 +361,30 @@ def main():
                 stop = False
                 while font_height != height_of_the_printable_area:
                     if font_height > height_of_the_printable_area:
+                        # Try to slightly decrease line_spacing
+                        if len(text_lines) > 1:
+                            min_spacing = args.line_spacing * 0.9  # Don't go below this multiplier
+                            spacing_step = 0.01
+                            new_spacing = args.line_spacing
+                            found_fit = False
+                            while new_spacing > min_spacing:
+                                new_spacing -= spacing_step
+                                font_width2, font_height2, _ = calculate_multiline_dimensions(
+                                    text_lines, font, new_spacing
+                                )
+                                if font_height2 == height_of_the_printable_area:
+                                    # Found a fit, update spacing and dimensions
+                                    args.line_spacing = new_spacing
+                                    print(
+                                        f"Line spacing has been slightly decreased "
+                                        f"to fit the printable area. Used value: {new_spacing:.2f}."
+                                    )
+                                    font_width, font_height = font_width2, font_height2
+                                    found_fit = True
+                                    break
+                            if found_fit:
+                                break
+                        # If not multiline or can't fit by spacing, decrease font size
                         font_size -= 1
                         stop = True
                     else:

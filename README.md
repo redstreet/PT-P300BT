@@ -1,28 +1,54 @@
 # Printing to a Brother P-Touch Cube PT-P300BT label printer from a computer
 
+A Python-based label printing utility designed for Brother PT-P300BT thermal label printers. This program creates custom labels with text, images, and advanced formatting options, automatically optimizing content to fit within the printer's specifications.
+
+It supports any TrueType and OpenType font, automatically selects the maximum font size to fit the printable area of the tape. Text strings including characters which do not [overshoot](https://en.wikipedia.org/wiki/Overshoot_(typography)) below the [baseline](https://en.wikipedia.org/wiki/Baseline_(typography)) (e.g., uppercase letters) are automatically printed with a bigger font. In addition, the program calculates the size of the printed tape and the print duration and processes images.
+
 ## Introduction
 
 The [Brother P-touch Cube PT-P300BT labelling machine](https://support.brother.com/g/b/producttop.aspx?c=gb&lang=en&prod=p300bteuk) is intended to be controlled from the official Brother P-touch Design&Print 2 app for [Android](https://play.google.com/store/apps/details?id=com.brother.ptouch.designandprint2) and [iOS](https://apps.apple.com/it/app/brother-p-touch-design-print/id1105307806) devices.
 
-This repository provides a command-line tool in pure Python to print from a computer. It is based on the scripts included in the following Gists:
+This repository provides a command-line tool in pure Python to print from a computer.
 
-- [PT-P300BT Gist](https://gist.github.com/Ircama/bd53c77c98ecd3d7db340c0398b22d8a)
-- [dogtopus/Pipfile Gist](https://gist.github.com/dogtopus/64ae743825e42f2bb8ec79cea7ad2057)
-- [stecman Gist](https://gist.github.com/stecman/ee1fd9a8b1b6f0fdd170ee87ba2ddafd)
-- [vsigler Gist](https://gist.github.com/vsigler/98eafaf8cdf2374669e590328164f5fc)
+## Features
 
-The scripts convert text labels to appropriate images (including the first page of a PDF conversion with "pdf2image" and which requires poppler to be installed) compatible with 12mm width craft tapes like [TZe-131](https://www.brother-usa.com/products/tze131) or [TZe-231](https://www.brother-usa.com/products/tze231), tuned for the max allowed character size with this printer, regardless the used font. The scripts also include the code to drive the printer via serial Bluetooth interface.
+### Text Rendering
+- **Unicode Support**: Full UTF-8 character support with optional Unicode escape sequences
+- **Custom Fonts**: Support for TrueType (.ttf) and OpenType (.otf) fonts
+- **Automatic Font Sizing**: Intelligent font size optimization to fit the printable area
+- **Multiline Text**: Support for multi-line labels with configurable line spacing
+- **Text Styling**: Configurable fill colors, stroke effects, and text centering
+- **Font Scaling**: Manual font size scaling with percentage-based adjustments
 
-Text can be multiline when the text includes "\n" characters. (Use the two characters `\n` in your text to create line breaks). The `--line-spacing` option controls the spacing between lines (default: 1.2, meaning 20% extra space between lines). The font size is automatically calculated to fit all lines within the printable area. The `--center-text` option allows horizontally centering each single line.
+### Image Processing
+- **Image Integration**: Merge images with text labels
+- **PDF Support**: Convert PDF files to images for printing
+- **Smart Cropping**: Automatic cropping of white space around image content
+- **Aspect Ratio Preservation**: Maintains image proportions while resizing
+- **Multiple Image Merge**: Combine multiple images in a single label
 
-Comparing with the PT-P300BT Gist, the Python *printlabel.py* program has been introduced, replacing *printlabel.cmd* and *printlabel.sh*. It supports any TrueType and OpenType font, automatically selects the maximum font size to fit the printable area of the tape, avoids creating temporary image files, provides more accurate image processing and does not rely on ImageMagick. Text strings including characters which do not [overshoot](https://en.wikipedia.org/wiki/Overshoot_(typography)) below the [baseline](https://en.wikipedia.org/wiki/Baseline_(typography)) (e.g., uppercase letters) are automatically printed with a bigger font. In addition, the program calculates the size of the printed tape and the print duration and processes images.
+### Label Customization
+- **Flexible Sizing**: Custom horizontal text stretching to specified millimeter widths
+- **Padding Control**: Adjustable horizontal padding and vertical positioning
+- **End Margins**: Configurable end margins for label finishing
+- **Auto-cutting**: Optional automatic cutting or label boundary marking
+- **Chain Printing**: Disable feeding for continuous label chains
+
+### Advanced Features
+- **Line Spacing Optimization**: Automatic line spacing adjustment when text doesn't fit
+- **Visual Guides**: Optional ruler lines and printable area indicators
+- **Binary Conversion**: Optimized image processing with custom thresholding
+- **Compression Control**: Optional compression disable for specific printing needs
+- **Preview Mode**: View generated images before printing
+
+## Usage
 
 Standard usage: `python3 printlabel.py COM_PORT FONT_NAME TEXT_TO_PRINT`
 
-Examples:
+### Basic Text Label
 
 ```
-python3 printlabel.py COM7 "arial.ttf" "Lorem Ipsum"
+python3 printlabel.py -sl COM7 "arial.ttf" "Lorem Ipsum"
 ```
 
 or:
@@ -31,7 +57,20 @@ or:
 printlabel.exe COM7 "arial.ttf" "Lorem Ipsum"
 ```
 
-In addition, all options included in *labelmaker.py* are available, with several extensions.
+### Multiline Text Label
+
+Text can be multiline when the text includes "\n" characters. (Use the two characters `\n` in your text to create line breaks). The `--line-spacing` option controls the spacing between lines (default: 1.2, meaning 20% extra space between lines). The font size is automatically calculated to fit all lines within the printable area. The `--center-text` option allows horizontally centering each single line.
+
+```bash
+python printlabel.py -sl COM3 arial.ttf "Line 1\nLine 2\nLine 3"
+```
+
+### Unicode Text
+```bash
+python printlabel.py -sl -u COM3 arial.ttf "Caf\u00e9"
+```
+
+## Command Line Arguments
 
 ```
 usage: printlabel.py [-h] [-u] [-l] [-s] [-c] [-i FILE_NAME] [-M FILE_NAME] [-R FLOAT]
@@ -41,14 +80,17 @@ usage: printlabel.py [-h] [-u] [-l] [-s] [-c] [-i FILE_NAME] [-M FILE_NAME] [-R 
                      [--font-scale NUMBER] [--h-padding DOTS] [--v-shift DOTS]
                      [-p MULTIPLIER] [-H] [--white-level NUMBER] [--threshold NUMBER]
                      COM_PORT [FONT_NAME] [TEXT_TO_PRINT ...]
+```
 
-positional arguments:
-  COM_PORT              Printer COM port.
-  FONT_NAME             Pathname of the used TrueType or OpenType font.
-  TEXT_TO_PRINT         Text to be printed. UTF8 characters are accepted. Use \n for line
-                        breaks.
+Required positional arguments
 
-optional arguments:
+- `COM_PORT`: Serial port for printer communication (e.g., COM3, /dev/ttyUSB0)
+- `FONT_NAME`: Path to TrueType or OpenType font file (optional, defaults to arial.ttf)
+- `TEXT_TO_PRINT`: Text content for the label (supports multiple arguments)
+
+Optional arguments:
+
+```
   -h, --help            show this help message and exit
   -u, --unicode         Use Unicode escape sequences in TEXT_TO_PRINT.
   -l, --lines           Add horizontal lines for drawing area (dotted red) and tape
@@ -97,6 +139,8 @@ optional arguments:
                         manually decide which pixel values become black or white (Default:
                         75)
 ```
+
+## Usage details
 
 Options `-sln` are useful to simulate the print, showing the created image and adding a ruler in inches and centimeters (magenta), with horizontal lines to mark the drawing area (dotted red) and the tape borders (cyan).
 
@@ -204,6 +248,19 @@ The max. length of the printable area is 0,499 m.
 Even if the Brother TZe tape size is 12 mm, the height of the printable area is 64 pixels, which is 9 mm at 180 DPI: 64 pixels / 180 DPI / 0.0393701 inch/mm = 9 mm.
 
 On this printer, tape is wasted before and after the printable area on each label (about 2.5 cm of additional tape before the printed area and about 1 mm after it).
+
+## History
+
+This repository is based on the scripts included in the following Gists:
+
+- [PT-P300BT Gist](https://gist.github.com/Ircama/bd53c77c98ecd3d7db340c0398b22d8a)
+- [dogtopus/Pipfile Gist](https://gist.github.com/dogtopus/64ae743825e42f2bb8ec79cea7ad2057)
+- [stecman Gist](https://gist.github.com/stecman/ee1fd9a8b1b6f0fdd170ee87ba2ddafd)
+- [vsigler Gist](https://gist.github.com/vsigler/98eafaf8cdf2374669e590328164f5fc)
+
+The scripts convert text labels to appropriate images (including the first page of a PDF conversion with "pdf2image" and which requires poppler to be installed) compatible with 12mm width craft tapes like [TZe-131](https://www.brother-usa.com/products/tze131) or [TZe-231](https://www.brother-usa.com/products/tze231), tuned for the max allowed character size with this printer, regardless the used font. The scripts also include the code to drive the printer via serial Bluetooth interface.
+
+Comparing this repository with the PT-P300BT Gist, the Python *printlabel.py* program has been introduced, replacing *printlabel.cmd* and *printlabel.sh* with several enhancements; it avoids creating temporary image files, provides more accurate image processing and does not rely on ImageMagick. In addition, all options included in the original *labelmaker.py* module are available, with several extensions.
 
 ## Other resources
 
