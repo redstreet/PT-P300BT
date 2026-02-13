@@ -28,6 +28,12 @@ def set_args():
         metavar='MILLIMETERS',  
         help='Pad label to exact width in mm (adds whitespace if text is shorter).'  
     )
+    p.add_argument(  
+        '--fixed-font-size',  
+        type=int,  
+        metavar='SIZE',  
+        help='Use fixed font size (disables auto-sizing to fit printable area)'  
+    )
     p.add_argument(
         'fontname',
         metavar='FONT_NAME',
@@ -360,60 +366,69 @@ def main():
             
             # Check if text contains newlines to determine processing mode
             has_newlines = '\\n' in text
-            
+
             if has_newlines:
                 # Split text into lines for multiline processing
                 text_lines = text.replace("\\n", "\n").split('\n')
-                
-                stop = False
-                while font_height != height_of_the_printable_area:
-                    if font_height > height_of_the_printable_area:
-                        # Try to slightly decrease line_spacing
-                        if len(text_lines) > 1:
-                            min_spacing = args.line_spacing * 0.9  # Don't go below this multiplier
-                            spacing_step = 0.01
-                            new_spacing = args.line_spacing
-                            found_fit = False
-                            while new_spacing > min_spacing:
-                                new_spacing -= spacing_step
-                                font_width2, font_height2, _ = calculate_multiline_dimensions(
-                                    text_lines, font, new_spacing
-                                )
-                                if font_height2 == height_of_the_printable_area:
-                                    # Found a fit, update spacing and dimensions
-                                    args.line_spacing = new_spacing
-                                    print(
-                                        f"Line spacing has been slightly decreased "
-                                        f"to fit the printable area. Used value: {new_spacing:.2f}."
+
+                if args.fixed_font_size:
+                    font_size = args.fixed_font_size  
+                    font = ImageFont.truetype(args.fontname, font_size, encoding='utf-8')  
+                    font_width, font_height, line_heights = calculate_multiline_dimensions(  
+                        text_lines, font, args.line_spacing  
+                    )  
+                    if font_height > height_of_the_printable_area:  
+                        print(f"Warning: fixed font size {font_size} exceeds printable area ({font_height} > {height_of_the_printable_area})")  
+                else:
+                    stop = False
+                    while font_height != height_of_the_printable_area:
+                        if font_height > height_of_the_printable_area:
+                            # Try to slightly decrease line_spacing
+                            if len(text_lines) > 1:
+                                min_spacing = args.line_spacing * 0.9  # Don't go below this multiplier
+                                spacing_step = 0.01
+                                new_spacing = args.line_spacing
+                                found_fit = False
+                                while new_spacing > min_spacing:
+                                    new_spacing -= spacing_step
+                                    font_width2, font_height2, _ = calculate_multiline_dimensions(
+                                        text_lines, font, new_spacing
                                     )
-                                    font_width, font_height = font_width2, font_height2
-                                    found_fit = True
+                                    if font_height2 == height_of_the_printable_area:
+                                        # Found a fit, update spacing and dimensions
+                                        args.line_spacing = new_spacing
+                                        print(
+                                            f"Line spacing has been slightly decreased "
+                                            f"to fit the printable area. Used value: {new_spacing:.2f}."
+                                        )
+                                        font_width, font_height = font_width2, font_height2
+                                        found_fit = True
+                                        break
+                                if found_fit:
                                     break
-                            if found_fit:
-                                break
-                        # If not multiline or can't fit by spacing, decrease font size
-                        font_size -= 1
-                        stop = True
-                    else:
-                        font_size += 1
-                    try:
-                        font = ImageFont.truetype(
-                            args.fontname, font_size, encoding='utf-8'
+                            # If not multiline or can't fit by spacing, decrease font size
+                            font_size -= 1
+                            stop = True
+                        else:
+                            font_size += 1
+                        try:
+                            font = ImageFont.truetype(
+                                args.fontname, font_size, encoding='utf-8'
+                            )
+                        except Exception as e:
+                            p.error(f'Cannot load font "{args.fontname}" - {e}')
+                        
+                        # Calculate dimensions for multiline text
+                        font_width, font_height, line_heights = calculate_multiline_dimensions(
+                            text_lines, font, args.line_spacing
                         )
-                    except Exception as e:
-                        p.error(f'Cannot load font "{args.fontname}" - {e}')
-                    
-                    # Calculate dimensions for multiline text
-                    font_width, font_height, line_heights = calculate_multiline_dimensions(
-                        text_lines, font, args.line_spacing
-                    )
-                    
-                    if stop:
-                        print(
-                            "The max height of this text with font "
-                            f'"{args.fontname}" is {font_height} dots'
-                            f' instead of {height_of_the_printable_area}.')
-                        break
+                        
+                        if stop:
+                            print(
+                                "The max height of this text with font "
+                                f'"{args.fontname}" is {font_height} dots'
+                                f' instead of {height_of_the_printable_area}.')
+                            break
 
                 y_position = print_border
                 if args.font_scale:
@@ -477,26 +492,33 @@ def main():
                     draw = ImageDraw.Draw(image)
             else:
                 # Single-line processing
-                stop = False
-                while font_height != height_of_the_printable_area:
-                    if font_height > height_of_the_printable_area:
-                        font_size -= 1
-                        stop = True
-                    else:
-                        font_size += 1
-                    try:
-                        font = ImageFont.truetype(
-                            args.fontname, font_size, encoding='utf-8'
-                        )
-                    except Exception as e:
-                        p.error(f'Cannot load font "{args.fontname}" - {e}')
-                    font_width, font_height = font.getbbox(text, anchor="lt")[2:]
-                    if stop:
-                        print(
-                            "The max height of this text with font "
-                            f'"{args.fontname}" is {font_height} dots'
-                            f' instead of {height_of_the_printable_area}.')
-                        break
+                if args.fixed_font_size:  
+                    font_size = args.fixed_font_size  
+                    font = ImageFont.truetype(args.fontname, font_size, encoding='utf-8')  
+                    font_width, font_height = font.getbbox(text, anchor="lt")[2:]  
+                    if font_height > height_of_the_printable_area:  
+                        print(f"Warning: fixed font size {font_size} exceeds printable area ({font_height} > {height_of_the_printable_area})")  
+                else:
+                    stop = False
+                    while font_height != height_of_the_printable_area:
+                        if font_height > height_of_the_printable_area:
+                            font_size -= 1
+                            stop = True
+                        else:
+                            font_size += 1
+                        try:
+                            font = ImageFont.truetype(
+                                args.fontname, font_size, encoding='utf-8'
+                            )
+                        except Exception as e:
+                            p.error(f'Cannot load font "{args.fontname}" - {e}')
+                        font_width, font_height = font.getbbox(text, anchor="lt")[2:]
+                        if stop:
+                            print(
+                                "The max height of this text with font "
+                                f'"{args.fontname}" is {font_height} dots'
+                                f' instead of {height_of_the_printable_area}.')
+                            break
 
                 y_position = print_border
                 if args.font_scale:
@@ -567,6 +589,8 @@ def main():
             )
             draw = ImageDraw.Draw(image)
 
+        if not args.fixed_font_size:  
+            print("Font size determined:", font_size)
         if args.merge:
             for i in reversed(args.merge):
                 loaded_image = process_image(
