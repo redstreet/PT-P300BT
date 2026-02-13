@@ -21,6 +21,13 @@ def set_args():
         metavar='COM_PORT',
         help='Printer COM port.'
     )
+    p.add_argument(  
+        '--fixed-width',  
+        type=int,  
+        default=None,  
+        metavar='MILLIMETERS',  
+        help='Pad label to exact width in mm (adds whitespace if text is shorter).'  
+    )
     p.add_argument(
         'fontname',
         metavar='FONT_NAME',
@@ -580,6 +587,17 @@ def main():
                 image = dst
             # Convert the image to binary
             draw = ImageDraw.Draw(image)
+
+        if args.fixed_width:  
+            target_width_dots = int(round(args.fixed_width / 0.149))  
+            current_width = image.width  
+            if current_width < target_width_dots:  
+                # Create a new white image of target width and paste the existing image centered or left-aligned  
+                padded_image = Image.new("RGB", (target_width_dots, image.height), "white")  
+                # Example: left-aligned paste; change x_offset for centering  
+                x_offset = 0  
+                padded_image.paste(image, (x_offset, 0))  
+                image = padded_image
 
         if args.lines:
             # Draw ruler (in)
