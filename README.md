@@ -228,6 +228,13 @@ The following steps allow connecting a Windows COM port to the Bluetooth printer
 
 Perform the device pairing.
 
+## Windows Bluetooth Quirk
+- As [pytouch-cube](https://github.com/piksel/pytouch-cube) says, for the Brother Cube
+  PT-300BT Label Maker:
+  > After connecting to the device it will automatically disconnect again.
+  - Windows says "Driver Unavailable"
+  - But if you simply run the program (under PowerShell), it will work
+
 ## Usage on WSL
 
 Pair the printer with an RFCOMM COM port using the Windows Bluetooth panel.
