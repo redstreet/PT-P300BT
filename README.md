@@ -1,3 +1,5 @@
+__Note: This fork adds features: --fixed-width and --fixed-font-size__
+
 # Printing to a Brother P-Touch Cube PT-P300BT label printer from a computer
 
 A Python-based label printing utility designed for Brother PT-P300BT thermal label printers. This program creates custom labels with text, images, and advanced formatting options, automatically optimizing content to fit within the printer's specifications.
