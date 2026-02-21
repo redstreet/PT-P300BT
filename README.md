@@ -123,7 +123,7 @@ Optional arguments:
   --font-scale NUMBER   Scale font size by specified percentage (default: 100%)
   --h-padding DOTS      Define custom left and right horizontal padding in pixels
                         (default: 5 pixels left and 5 pixels right)
-  --v-shift DOTS        Define relative vertical traslation in pixels (default is to
+  --v-shift DOTS        Define relative vertical translation in pixels (default is to
                         vertically center the font)
   -p MULTIPLIER, --line-spacing MULTIPLIER
                         Line spacing multiplier for multi-line text (default: 1.2)
@@ -139,13 +139,13 @@ Optional arguments:
 
 Options `-sln` are useful to simulate the print, showing the created image and adding a ruler in inches and centimeters (magenta), with horizontal lines to mark the drawing area (dotted red) and the tape borders (cyan).
 
-Before generating the text (`TEXT_TO_PRINT`), the tool allows concatenating images with the `-M` option; it can be used more times for multiple images (transparent images are also accepted). The final image can also be saved with the `-S` option and then reused by running again the tool with the `-M` option; when also setting `TEXT_TO_PRINT` to a null string (`""`), the reused image will remain unchanged. Merged images are automatically resized to fit the printable area, removing white borders without modifying the proportion. Resize and traslation of merged images can also be manually controlled with `-R` (floating point number), `-X`, `-Y`. The `--text-size` option horizontally stretches or squeezes the text so that it fits the specified size in millimeters; the size parameter includes `--end-margin` and default left and right paddings, but does not include the size of merged images if used, which have a fixed length that has to be kept proportioned. The `font-scale` allows specifying a percentage to scale the font size, maintaining the aspect ratio; font sizes > 100 are accepted even if potentially causing overflow. `--h-padding` and `--v-shift` allow horizontally and vertically traslating the text (using `--h-padding` with `--end-margin` enables separately cointrolling left and right margins; specifically `--h-padding` uses the same value for the left and right parts, while `--end-margin` will be a relative value applied to the right `--h-padding`).
+Before generating the text (`TEXT_TO_PRINT`), the tool allows concatenating images with the `-M` option; it can be used more times for multiple images (transparent images are also accepted). The final image can also be saved with the `-S` option and then reused by running again the tool with the `-M` option; when also setting `TEXT_TO_PRINT` to a null string (`""`), the reused image will remain unchanged. Merged images are automatically resized to fit the printable area, removing white borders without modifying the proportion. Resize and translation of merged images can also be manually controlled with `-R` (floating point number), `-X`, `-Y`. The `--text-size` option horizontally stretches or squeezes the text so that it fits the specified size in millimeters; the size parameter includes `--end-margin` and default left and right paddings, but does not include the size of merged images if used, which have a fixed length that has to be kept proportioned. The `font-scale` allows specifying a percentage to scale the font size, maintaining the aspect ratio; font sizes > 100 are accepted even if potentially causing overflow. `--h-padding` and `--v-shift` allow horizontally and vertically translating the text (using `--h-padding` with `--end-margin` enables separately cointrolling left and right margins; specifically `--h-padding` uses the same value for the left and right parts, while `--end-margin` will be a relative value applied to the right `--h-padding`).
 
 `-i` runs the legacy process of *labelmaker.py* and disables image processing.
 
 ## Further examples
 
-Example of merging image and text, automatically resizing and traslating the image so that it fits the printable area:
+Example of merging image and text, automatically resizing and translating the image so that it fits the printable area:
 
 ```bash
 curl https://raw.githubusercontent.com/uroesch/pngpetite/main/samples/pngpetite/happy-sun.png -o resources/happy-sun.png
@@ -217,7 +217,7 @@ The following steps allow connecting a Windows COM port to the Bluetooth printer
 - Press "More Bluetooth settings"
 - Select "COM Ports" tab
 - Press Add... (wait for a while)
-- Select Ongoing
+- Select Outgoing
 - Press Browse...
 - Search for PT-P300BT9000 and select it
 - Select PT-P300BT9000
@@ -226,13 +226,20 @@ The following steps allow connecting a Windows COM port to the Bluetooth printer
 - Press OK
 - Press OK
 
-Perform the device peering. 
+Perform the device pairing.
+
+## Windows Bluetooth Quirk
+- As [pytouch-cube](https://github.com/piksel/pytouch-cube) says, for the Brother Cube
+  PT-300BT Label Maker:
+  > After connecting to the device it will automatically disconnect again.
+  - Windows says "Driver Unavailable"
+  - But if you simply run the program (under PowerShell), it will work
 
 ## Usage on WSL
 
 Pair the printer with an RFCOMM COM port using the Windows Bluetooth panel.
 
-Check the outbound RFCOMM COM port number and use it to define /dev/ttyS_serial_port_number; for instance, COM5 is /dev/ttyS5.
+Check the outgoing RFCOMM COM port number and use it to define /dev/ttyS_serial_port_number; for instance, COM5 is /dev/ttyS5.
 
 Usage: `python3 printlabel.py /dev/ttyS_serial_port_number FONT_NAME TEXT_TO_PRINT`
 
